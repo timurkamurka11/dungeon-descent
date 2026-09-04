@@ -1,0 +1,71 @@
+name: Fix empty wood texture
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.issue.title == 'fix-empty-wood-texture'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Add media regression guard and verify RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tools/verify_project.py')
+          s=p.read_text()
+          marker='# Ban explicit placeholder artifacts in project-owned runtime/art files.'
+          guard="""# Runtime media files must exist and contain bytes.\nfor base in [ROOT/'Assets/DungeonDescent/Art', ROOT/'Assets/DungeonDescent/Resources']:\n    if not base.exists():\n        continue\n    for media in base.rglob('*'):\n        if media.suffix.lower() not in {'.png','.wav'}:\n            continue\n        if media.stat().st_size <= 0:\n            errors.append(f\"empty media file: {media.relative_to(ROOT)}\")\n\n"""
+          if guard not in s:
+              if marker not in s:
+                  raise SystemExit('verifier insertion marker not found')
+              s=s.replace(marker,guard+marker,1)
+              p.write_text(s)
+          PY
+          set +e
+          python tools/verify_project.py >/tmp/red.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/red.log
+          test "$code" -ne 0
+          grep -q "empty media file: Assets/DungeonDescent/Resources/Textures/wood_albedo.png" /tmp/red.log
+          echo "MEDIA_RED=PASS"
+
+      - name: Restore runtime wood texture from project-owned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s Assets/DungeonDescent/Art/Textures/wood_albedo.png
+          cp Assets/DungeonDescent/Art/Textures/wood_albedo.png Assets/DungeonDescent/Resources/Textures/wood_albedo.png
+          test -s Assets/DungeonDescent/Resources/Textures/wood_albedo.png
+          cmp -s Assets/DungeonDescent/Art/Textures/wood_albedo.png Assets/DungeonDescent/Resources/Textures/wood_albedo.png
+
+      - name: Verify GREEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/verify_project.py
+          test "$(stat -c%s Assets/DungeonDescent/Resources/Textures/wood_albedo.png)" -eq "$(stat -c%s Assets/DungeonDescent/Art/Textures/wood_albedo.png)"
+          echo "MEDIA_GREEN=PASS"
+
+      - name: Commit and push fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Dungeon Descent Fix'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Assets/DungeonDescent/Resources/Textures/wood_albedo.png tools/verify_project.py
+          git commit -m 'fix: restore runtime wood texture'
+          git push origin development
