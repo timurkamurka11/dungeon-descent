@@ -2,7 +2,9 @@ using NUnit.Framework;
 using DungeonDescent.Save;
 using DungeonDescent.Combat;
 using DungeonDescent.Progression;
+using DungeonDescent.UI;
 using DungeonDescent.World;
+using UnityEngine;
 
 namespace DungeonDescent.Tests.EditMode
 {
@@ -32,6 +34,18 @@ namespace DungeonDescent.Tests.EditMode
         }
 
         [Test]
+        public void Health_DamagePublishesChangedValue()
+        {
+            var health = new HealthModel(100f);
+            var current = 100f;
+            var maximum = 100f;
+            health.Changed += (c, m) => { current = c; maximum = m; };
+            health.ApplyDamage(25f);
+            Assert.AreEqual(75f, current, 0.001f);
+            Assert.AreEqual(100f, maximum, 0.001f);
+        }
+
+        [Test]
         public void Stamina_UsesCostAndRegeneratesAfterDelay()
         {
             var stamina = new StaminaModel(100f, 20f, 0.5f);
@@ -40,6 +54,25 @@ namespace DungeonDescent.Tests.EditMode
             Assert.AreEqual(70f, stamina.Current, 0.001f);
             stamina.Tick(0.5f);
             Assert.Greater(stamina.Current, 70f);
+        }
+
+        [Test]
+        public void HudValue_NormalizesAndClamps()
+        {
+            Assert.AreEqual(.75f, HudValue.Normalized(75f, 100f), .0001f);
+            Assert.AreEqual(1f, HudValue.Normalized(130f, 100f), .0001f);
+            Assert.AreEqual(0f, HudValue.Normalized(-5f, 100f), .0001f);
+            Assert.AreEqual(0f, HudValue.Normalized(50f, 0f), .0001f);
+        }
+
+        [Test]
+        public void MeleeTargeting_AcceptsFrontTargetAndRejectsBehindOrTooFar()
+        {
+            var origin = Vector3.zero;
+            var forward = Vector3.forward;
+            Assert.IsTrue(MeleeTargeting.IsInsideMeleeArc(origin, forward, new Vector3(0f, 0f, 1.6f), 2.35f, .10f));
+            Assert.IsFalse(MeleeTargeting.IsInsideMeleeArc(origin, forward, new Vector3(0f, 0f, -1.0f), 2.35f, .10f));
+            Assert.IsFalse(MeleeTargeting.IsInsideMeleeArc(origin, forward, new Vector3(0f, 0f, 3.0f), 2.35f, .10f));
         }
 
         [Test]
