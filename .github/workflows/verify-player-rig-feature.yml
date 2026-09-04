@@ -1,4 +1,4 @@
-name: Verify Player Rig Feature
+name: Verify Player Rig Development
 
 on:
   issues:
@@ -9,21 +9,21 @@ permissions:
 
 jobs:
   verify:
-    if: github.event.issue.title == 'verify-player-rig-feature'
+    if: github.event.issue.title == 'verify-player-rig-development'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact feature
+      - name: Checkout delivered development
         uses: actions/checkout@v4
         with:
-          ref: feature/player-rig-combat-hud-pass
+          ref: development
           fetch-depth: 0
 
       - name: Full repository verifier
         run: |
           set -euo pipefail
           python tools/verify_project.py
-          git diff --check origin/development...HEAD
-          echo "FEATURE_HEAD=$(git rev-parse HEAD)"
+          test -z "$(git status --porcelain)"
+          echo "DEVELOPMENT_HEAD=$(git rev-parse HEAD)"
 
       - name: Verify model identity and rig integration contract
         run: |
@@ -41,6 +41,8 @@ jobs:
           grep -q 'HudValue.Normalized' Assets/DungeonDescent/Runtime/UI/GameUI.cs
           grep -q 'leftCtrlKey.wasPressedThisFrame' Assets/DungeonDescent/Runtime/Player/PlayerController.cs
           grep -q 'spaceKey.wasPressedThisFrame' Assets/DungeonDescent/Runtime/Player/PlayerController.cs
+          grep -q 'CapsuleCollider' Assets/DungeonDescent/Runtime/Enemies/EnemyFactory.cs
+          grep -q 'class EnemyHealth : MonoBehaviour, IDamageable' Assets/DungeonDescent/Runtime/Enemies/EnemyHealth.cs
           echo 'PLAYER_PIPELINE_CONTRACT=PASS'
 
       - name: Parse all CSharp source with Roslyn
