@@ -90,6 +90,17 @@ for p in (ROOT/'Assets/DungeonDescent').rglob('*.cs'):
     if re.search(r'\bGameObject\.Find\s*\(', text):
         errors.append(f"GameObject.Find usage is forbidden: {p.relative_to(ROOT)}")
 
+# Cross-namespace compile guard for GameSession references.
+for source in (ROOT/'Assets/DungeonDescent').rglob('*.cs'):
+    text=source.read_text(errors='ignore')
+    if 'GameSession' not in text:
+        continue
+    if 'namespace DungeonDescent.Core' in text:
+        continue
+    if 'using DungeonDescent.Core;' in text or 'DungeonDescent.Core.GameSession' in text:
+        continue
+    errors.append(f"{source.relative_to(ROOT)} references GameSession without importing DungeonDescent.Core")
+
 # Main scene must contain the real bootstrap component and its stable script GUID.
 scene=req('Assets/DungeonDescent/Scenes/Main.unity')
 boot=req('Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs.meta')

@@ -1,6 +1,7 @@
 using System.Collections;
 using DungeonDescent.Audio;
 using DungeonDescent.Boss;
+using DungeonDescent.Core;
 using DungeonDescent.Enemies;
 using DungeonDescent.Interactables;
 using DungeonDescent.Player;
