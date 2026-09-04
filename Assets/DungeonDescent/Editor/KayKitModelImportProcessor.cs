@@ -7,16 +7,23 @@ namespace DungeonDescent.Editor
     {
         private const string KnightPath = "Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx";
 
+        private bool IsKnight => string.Equals(assetPath, KnightPath, StringComparison.OrdinalIgnoreCase);
+
         private void OnPreprocessModel()
         {
-            if (!string.Equals(assetPath, KnightPath, StringComparison.OrdinalIgnoreCase)) return;
+            if (!IsKnight) return;
             var importer = (ModelImporter)assetImporter;
             importer.animationType = ModelImporterAnimationType.Human;
             importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
             importer.importAnimation = true;
             importer.resampleCurves = true;
             importer.materialImportMode = ModelImporterMaterialImportMode.None;
+        }
 
+        private void OnPreprocessAnimation()
+        {
+            if (!IsKnight) return;
+            var importer = (ModelImporter)assetImporter;
             var clips = importer.defaultClipAnimations;
             for (var i = 0; i < clips.Length; i++)
             {
