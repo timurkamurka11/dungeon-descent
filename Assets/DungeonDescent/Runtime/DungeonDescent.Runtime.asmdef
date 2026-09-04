@@ -1,0 +1,14 @@
+{
+  "name": "DungeonDescent.Runtime",
+  "rootNamespace": "DungeonDescent",
+  "references": [
+    "Unity.InputSystem",
+    "Unity.Cinemachine",
+    "Unity.AI.Navigation",
+    "Unity.RenderPipelines.Universal.Runtime",
+    "Unity.RenderPipelines.Core.Runtime",
+    "UnityEngine.UI"
+  ],
+  "allowUnsafeCode": false,
+  "autoReferenced": true
+}

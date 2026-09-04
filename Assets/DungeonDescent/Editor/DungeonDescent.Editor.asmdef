@@ -1,0 +1,10 @@
+{
+  "name": "DungeonDescent.Editor",
+  "rootNamespace": "DungeonDescent.Editor",
+  "references": [
+    "DungeonDescent.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

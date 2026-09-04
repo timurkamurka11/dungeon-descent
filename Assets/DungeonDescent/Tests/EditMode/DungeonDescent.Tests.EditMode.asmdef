@@ -1,0 +1,8 @@
+{
+  "name": "DungeonDescent.Tests.EditMode",
+  "rootNamespace": "DungeonDescent.Tests.EditMode",
+  "references": ["DungeonDescent.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}
