@@ -22,7 +22,7 @@ jobs:
         run: |
           set -euo pipefail
           python tools/verify_project.py
-          git diff --check development...HEAD
+          git diff --check origin/development...HEAD
           echo "FEATURE_HEAD=$(git rev-parse HEAD)"
 
       - name: Verify model identity and rig integration contract
