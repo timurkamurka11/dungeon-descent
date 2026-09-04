@@ -1,0 +1,138 @@
+name: Integrate Player Rig Pass
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.event.issue.title == 'integrate-player-rig-pass'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout isolated feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/player-rig-combat-hud-pass
+          fetch-depth: 0
+
+      - name: Clone verified CC0 KayKit source
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git /tmp/kaykit
+          cd /tmp/kaykit
+          git lfs pull || true
+
+      - name: Copy real rigged Knight asset and Unity metadata
+        run: |
+          set -euo pipefail
+          src='/tmp/kaykit/addons/kaykit_character_pack_adventures/Characters/fbx'
+          dst='Assets/DungeonDescent/Resources/Models/Hero/KayKit'
+          mkdir -p "$dst"
+          cp "$src/Knight.fbx" "$dst/Knight.fbx"
+          cp "$src/knight_texture.png" "$dst/knight_texture.png"
+          test -s "$dst/Knight.fbx"
+          test -s "$dst/knight_texture.png"
+          test "$(stat -c%s "$dst/Knight.fbx")" -eq 20659324
+          echo 'b25e35cc7eaaa3c7c103f10a4f41fde1cbd81936fede9aa9ae4efbd29d40ba1b  Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx' | sha256sum -c -
+          echo '5d250ccc5da020e6126bfa3839f83bd9a465a951ed223e4d13c08b1925e154d4  Assets/DungeonDescent/Resources/Models/Hero/KayKit/knight_texture.png' | sha256sum -c -
+          cat > Assets/DungeonDescent/Resources/Models.meta <<'EOF'
+          fileFormatVersion: 2
+          guid: 7ac5f33fbb5d47c9bc3e5ad03b839151
+          folderAsset: yes
+          DefaultImporter:
+            externalObjects: {}
+            userData: 
+            assetBundleName: 
+            assetBundleVariant: 
+          EOF
+          cat > Assets/DungeonDescent/Resources/Models/Hero.meta <<'EOF'
+          fileFormatVersion: 2
+          guid: 93cc2660f61e48efac24e8d0192511bd
+          folderAsset: yes
+          DefaultImporter:
+            externalObjects: {}
+            userData: 
+            assetBundleName: 
+            assetBundleVariant: 
+          EOF
+          cat > Assets/DungeonDescent/Resources/Models/Hero/KayKit.meta <<'EOF'
+          fileFormatVersion: 2
+          guid: d65a1f06ef71409ab81e35d385d4935a
+          folderAsset: yes
+          DefaultImporter:
+            externalObjects: {}
+            userData: 
+            assetBundleName: 
+            assetBundleVariant: 
+          EOF
+          printf 'fileFormatVersion: 2\nguid: 89708ed163b944608cfbfc3a85fb6785\n' > "$dst/Knight.fbx.meta"
+          printf 'fileFormatVersion: 2\nguid: 42322700a59b4e43868739894170336b\n' > "$dst/knight_texture.png.meta"
+
+      - name: Patch HUD bar rendering and controls
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('Assets/DungeonDescent/Runtime/UI/GameUI.cs')
+          s=p.read_text()
+          changes=[
+            ('BuildDeath();Subscribe();player.SetMovementLocked(true);', 'BuildDeath();Subscribe();SyncVitals();player.SetMovementLocked(true);'),
+            ('var img=f.gameObject.AddComponent<Image>();img.color=fill;img.type=Image.Type.Filled;img.fillMethod=Image.FillMethod.Horizontal;img.fillAmount=1f;', 'var img=f.gameObject.AddComponent<Image>();img.color=fill;img.type=Image.Type.Simple;f.pivot=new Vector2(0f,.5f);'),
+            ('private void OnHealth(float c,float m){if(healthFill!=null)healthFill.fillAmount=m>0?c/m:0;}', 'private void OnHealth(float c,float m){SetBar(healthFill,HudValue.Normalized(c,m));}'),
+            ('private void OnStamina(float c,float m){if(staminaFill!=null)staminaFill.fillAmount=m>0?c/m:0;}', 'private void OnStamina(float c,float m){SetBar(staminaFill,HudValue.Normalized(c,m));}'),
+            ('bossFill.fillAmount=m>0?c/m:0;', 'SetBar(bossFill,HudValue.Normalized(c,m));'),
+            ('SPACE   Dodge / Evade\\nLMB', 'SPACE   Jump\\nLEFT CTRL   Dodge / Roll\\nLMB'),
+            ('mainMenu.SetActive(false);hud.SetActive(true);Time.timeScale=1f;', 'mainMenu.SetActive(false);hud.SetActive(true);SyncVitals();Time.timeScale=1f;'),
+          ]
+          for old,new in changes:
+              if old not in s:
+                  raise SystemExit(f'GameUI patch marker not found: {old[:80]}')
+              s=s.replace(old,new,1)
+          marker='        private void OnEssence(int v){if(essenceText!=null)essenceText.text="ESSENCE  "+v;}'
+          helper='''        private void SetBar(Image bar,float normalized){if(bar==null)return;var scale=bar.rectTransform.localScale;scale.x=Mathf.Clamp01(normalized);scale.y=1f;scale.z=1f;bar.rectTransform.localScale=scale;}\n        private void SyncVitals(){var vitals=player!=null?player.GetComponent<PlayerVitals>():null;if(vitals==null)return;OnHealth(vitals.CurrentHealth,vitals.MaxHealth);OnStamina(vitals.CurrentStamina,vitals.MaxStamina);}\n'''
+          if marker not in s: raise SystemExit('GameUI helper insertion marker missing')
+          s=s.replace(marker,helper+marker,1)
+          p.write_text(s)
+          PY
+
+      - name: Extend repository verifier for real player pipeline
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tools/verify_project.py')
+          s=p.read_text()
+          marker="# Ban explicit placeholder artifacts in project-owned runtime/art files."
+          guard="""# Rigged real-player asset and integration contract.\nfor path in [\n    'Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx',\n    'Assets/DungeonDescent/Resources/Models/Hero/KayKit/knight_texture.png',\n    'Assets/DungeonDescent/Runtime/Player/PlayerModelFactory.cs',\n    'Assets/DungeonDescent/Editor/KayKitModelImportProcessor.cs',\n    'Assets/DungeonDescent/Runtime/Combat/MeleeTargeting.cs',\n    'Assets/DungeonDescent/Runtime/UI/HudValue.cs',\n]:\n    asset=req(path)\n    if asset.exists() and asset.is_file() and asset.stat().st_size <= 0:\n        errors.append(f'empty required player asset: {path}')\ncontains('THIRD_PARTY_ASSETS.md','KayKit Character Pack: Adventurers')\ncontains('THIRD_PARTY_ASSETS.md','CC0 1.0 Universal')\ncontains('Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs','PlayerModelFactory.Build')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs','AnimationMixerPlayable')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs','applyRootMotion = false')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerController.cs','leftCtrlKey.wasPressedThisFrame')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerController.cs','spaceKey.wasPressedThisFrame')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs','OverlapCapsuleNonAlloc')\ncontains('Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs','MeleeTargeting.IsInsideMeleeArc')\ncontains('Assets/DungeonDescent/Runtime/UI/GameUI.cs','HudValue.Normalized')\nbootstrap=(ROOT/'Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs').read_text(errors='ignore')\nif 'VisualFactory.BuildHero(go.transform)' in bootstrap:\n    errors.append('bootstrap still instantiates procedural player hero')\nui=(ROOT/'Assets/DungeonDescent/Runtime/UI/GameUI.cs').read_text(errors='ignore')\nif 'healthFill.fillAmount' in ui or 'staminaFill.fillAmount' in ui:\n    errors.append('HUD still uses broken sprite-less fillAmount path')\n\n"""
+          if guard not in s:
+              if marker not in s: raise SystemExit('verifier insertion marker missing')
+              s=s.replace(marker,guard+marker,1)
+              p.write_text(s)
+          PY
+
+      - name: Run full feature verification
+        run: |
+          set -euo pipefail
+          python tools/verify_project.py
+          git diff --check
+          test -s Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx
+          test -f Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx.meta
+          test -f Assets/DungeonDescent/Resources/Models/Hero/KayKit/knight_texture.png.meta
+          grep -q '1H_Melee_Attack_Slice_Horizontal' Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs
+          grep -q 'PlayerModelFactory.Build' Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs
+          ! grep -q 'VisualFactory.BuildHero(go.transform)' Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs
+          grep -q 'OverlapCapsuleNonAlloc' Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs
+          grep -q 'HudValue.Normalized' Assets/DungeonDescent/Runtime/UI/GameUI.cs
+          echo 'PLAYER_RIG_PASS_VERIFY=PASS'
+
+      - name: Commit and push isolated feature
+        run: |
+          set -euo pipefail
+          git config user.name 'Dungeon Descent Rig Pass'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Assets/DungeonDescent/Resources/Models.meta Assets/DungeonDescent/Resources/Models Assets/DungeonDescent/Runtime/UI/GameUI.cs tools/verify_project.py
+          git commit -m 'feat: integrate rigged knight and repair player feedback'
+          git push origin feature/player-rig-combat-hud-pass
