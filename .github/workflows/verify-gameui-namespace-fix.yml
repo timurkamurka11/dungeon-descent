@@ -1,0 +1,29 @@
+name: Verify GameUI Namespace Fix
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event.issue.title == 'verify-gameui-namespace-fix'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/gameui-playervitals-namespace
+          fetch-depth: 0
+
+      - name: PlayerVitals namespace regression check
+        run: |
+          set -euo pipefail
+          python tools/check_cross_namespace.py
+
+      - name: Full repository verifier
+        run: |
+          set -euo pipefail
+          python tools/verify_project.py
