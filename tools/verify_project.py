@@ -52,6 +52,16 @@ for name in ['stone_albedo.png','stone_normal.png','wood_albedo.png','metal_albe
 for name in ['safe_room.wav','exploration.wav','combat.wav','boss.wav','fireplace.wav','dungeon_wind.wav','sword_swing.wav','sword_impact.wav','door_creak.wav','loot.wav','heal.wav']:
     req('Assets/DungeonDescent/Art/Audio/'+name)
 
+# Runtime media files must exist and contain bytes.
+for base in [ROOT/'Assets/DungeonDescent/Art', ROOT/'Assets/DungeonDescent/Resources']:
+    if not base.exists():
+        continue
+    for media in base.rglob('*'):
+        if media.suffix.lower() not in {'.png','.wav'}:
+            continue
+        if media.stat().st_size <= 0:
+            errors.append(f"empty media file: {media.relative_to(ROOT)}")
+
 # Ban explicit placeholder artifacts in project-owned runtime/art files.
 banned=[r'\bCapsule\b',r'\bPlaceholder\b',r'placeholder_ui',r'TODO:',r'TBD']
 for base in [ROOT/'Assets/DungeonDescent/Runtime', ROOT/'Assets/DungeonDescent/Art']:
