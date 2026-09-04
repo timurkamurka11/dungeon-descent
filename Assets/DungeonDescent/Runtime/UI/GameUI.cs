@@ -1,4 +1,5 @@
 using DungeonDescent.Audio;
+using DungeonDescent.Combat;
 using DungeonDescent.Core;
 using DungeonDescent.Player;
 using DungeonDescent.Progression;
