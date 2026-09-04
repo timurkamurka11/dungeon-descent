@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   verify:
-    if: github.event.issue.title == 'verify-dungeon-descent-transfer'
+    if: startsWith(github.event.issue.title, 'verify-dungeon-descent-transfer')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout development
@@ -43,6 +43,15 @@ jobs:
           test ! -d UserSettings
           test ! -d .bootstrap
 
+          missing_media=0
+          while IFS= read -r meta; do
+            f="${meta%.meta}"
+            if [ ! -f "$f" ]; then
+              echo "MISSING_MEDIA=$f"
+              missing_media=1
+            fi
+          done < <(git ls-files '*.png.meta' '*.wav.meta')
+
           files=$(git ls-files | wc -l | tr -d ' ')
           meta=$(git ls-files '*.meta' | wc -l | tr -d ' ')
           media=$(git ls-files '*.png' '*.wav' | wc -l | tr -d ' ')
@@ -50,6 +59,7 @@ jobs:
           echo "META_FILES=$meta"
           echo "MEDIA_FILES=$media"
 
+          test "$missing_media" -eq 0
           test "$files" -eq 227
           test "$meta" -eq 119
           test "$media" -eq 36
