@@ -1,0 +1,81 @@
+name: Fix Dungeon Descent GameSession import
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.issue.title == 'fix-gamesession-import'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Add regression guard and verify RED
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('tools/verify_project.py')
+          s = p.read_text()
+          marker = "# Main scene must contain the real bootstrap component and its stable script GUID."
+          guard = """# Cross-namespace compile guard for GameSession references.\nfor source in (ROOT/'Assets/DungeonDescent').rglob('*.cs'):\n    text=source.read_text(errors='ignore')\n    if 'GameSession' not in text:\n        continue\n    if 'namespace DungeonDescent.Core' in text:\n        continue\n    if 'using DungeonDescent.Core;' in text or 'DungeonDescent.Core.GameSession' in text:\n        continue\n    errors.append(f\"{source.relative_to(ROOT)} references GameSession without importing DungeonDescent.Core\")\n\n"""
+          if guard not in s:
+              if marker not in s:
+                  raise SystemExit('verifier insertion marker not found')
+              s = s.replace(marker, guard + marker, 1)
+              p.write_text(s)
+          PY
+
+          set +e
+          python tools/verify_project.py >/tmp/red.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/red.log
+          test "$code" -ne 0
+          grep -q "DungeonWorldBuilder.cs references GameSession without importing DungeonDescent.Core" /tmp/red.log
+          echo "REGRESSION_RED=PASS"
+
+      - name: Apply minimal namespace fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('Assets/DungeonDescent/Runtime/World/DungeonWorldBuilder.cs')
+          s = p.read_text()
+          if 'using DungeonDescent.Core;' not in s:
+              needle = 'using DungeonDescent.Boss;\n'
+              if needle not in s:
+                  raise SystemExit('import insertion marker not found')
+              s = s.replace(needle, needle + 'using DungeonDescent.Core;\n', 1)
+              p.write_text(s)
+          PY
+
+      - name: Verify GREEN
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/verify_project.py
+          grep -q '^using DungeonDescent.Core;$' Assets/DungeonDescent/Runtime/World/DungeonWorldBuilder.cs
+          echo "REGRESSION_GREEN=PASS"
+
+      - name: Commit and push fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Dungeon Descent Fix'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Assets/DungeonDescent/Runtime/World/DungeonWorldBuilder.cs tools/verify_project.py
+          git commit -m 'fix: resolve GameSession namespace in world builder'
+          git push origin development
