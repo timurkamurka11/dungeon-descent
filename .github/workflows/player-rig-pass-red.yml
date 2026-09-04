@@ -1,0 +1,26 @@
+name: Player Rig Pass RED
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  red:
+    if: github.event.issue.title == 'player-rig-pass-red'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/player-rig-combat-hud-pass
+      - name: Verify regression tests precede implementation
+        run: |
+          set -euo pipefail
+          tests='Assets/DungeonDescent/Tests/EditMode/DungeonDescentCoreTests.cs'
+          grep -q 'HudValue.Normalized' "$tests"
+          grep -q 'MeleeTargeting.IsInsideMeleeArc' "$tests"
+          test ! -f Assets/DungeonDescent/Runtime/UI/HudValue.cs
+          test ! -f Assets/DungeonDescent/Runtime/Combat/MeleeTargeting.cs
+          echo 'REGRESSION_RED=PASS'
