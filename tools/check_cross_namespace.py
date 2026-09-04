@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -7,13 +8,14 @@ errors = []
 
 for source in (ROOT / 'Assets' / 'DungeonDescent').rglob('*.cs'):
     text = source.read_text(errors='ignore')
-    if 'PlayerVitals' not in text:
+    bare_reference = re.search(r'(?<![\w.])PlayerVitals\b', text)
+    if not bare_reference:
         continue
     if 'namespace DungeonDescent.Combat' in text:
         continue
-    if 'using DungeonDescent.Combat;' in text or 'DungeonDescent.Combat.PlayerVitals' in text:
+    if 'using DungeonDescent.Combat;' in text:
         continue
-    errors.append(f"{source.relative_to(ROOT)} references PlayerVitals without importing DungeonDescent.Combat")
+    errors.append(f"{source.relative_to(ROOT)} references bare PlayerVitals without importing DungeonDescent.Combat")
 
 if errors:
     print('PLAYER_VITALS_NAMESPACE_CHECK=FAIL')
