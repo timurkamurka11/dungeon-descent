@@ -1,0 +1,73 @@
+name: Verify Player Rig Feature
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event.issue.title == 'verify-player-rig-feature'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact feature
+        uses: actions/checkout@v4
+        with:
+          ref: feature/player-rig-combat-hud-pass
+          fetch-depth: 0
+
+      - name: Full repository verifier
+        run: |
+          set -euo pipefail
+          python tools/verify_project.py
+          git diff --check development...HEAD
+          echo "FEATURE_HEAD=$(git rev-parse HEAD)"
+
+      - name: Verify model identity and rig integration contract
+        run: |
+          set -euo pipefail
+          echo 'b25e35cc7eaaa3c7c103f10a4f41fde1cbd81936fede9aa9ae4efbd29d40ba1b  Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx' | sha256sum -c -
+          echo '5d250ccc5da020e6126bfa3839f83bd9a465a951ed223e4d13c08b1925e154d4  Assets/DungeonDescent/Resources/Models/Hero/KayKit/knight_texture.png' | sha256sum -c -
+          grep -q 'OnPreprocessAnimation' Assets/DungeonDescent/Editor/KayKitModelImportProcessor.cs
+          grep -q 'ModelImporterAnimationType.Human' Assets/DungeonDescent/Editor/KayKitModelImportProcessor.cs
+          grep -q 'applyRootMotion = false' Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs
+          grep -q 'AnimationMixerPlayable' Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs
+          grep -q 'PlayerModelFactory.Build' Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs
+          ! grep -q 'VisualFactory.BuildHero(go.transform)' Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs
+          grep -q 'OverlapCapsuleNonAlloc' Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs
+          grep -q 'MeleeTargeting.IsInsideMeleeArc' Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs
+          grep -q 'HudValue.Normalized' Assets/DungeonDescent/Runtime/UI/GameUI.cs
+          grep -q 'leftCtrlKey.wasPressedThisFrame' Assets/DungeonDescent/Runtime/Player/PlayerController.cs
+          grep -q 'spaceKey.wasPressedThisFrame' Assets/DungeonDescent/Runtime/Player/PlayerController.cs
+          echo 'PLAYER_PIPELINE_CONTRACT=PASS'
+
+      - name: Parse all CSharp source with Roslyn
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/roslyn-check
+          cd /tmp/roslyn-check
+          dotnet new console --force >/dev/null
+          dotnet add package Microsoft.CodeAnalysis.CSharp --version 4.14.0 >/dev/null
+          cat > Program.cs <<'CS'
+          using System;
+          using System.IO;
+          using System.Linq;
+          using Microsoft.CodeAnalysis;
+          using Microsoft.CodeAnalysis.CSharp;
+          var root = Environment.GetEnvironmentVariable("GITHUB_WORKSPACE")!;
+          var failures = 0;
+          foreach (var path in Directory.EnumerateFiles(Path.Combine(root,"Assets","DungeonDescent"), "*.cs", SearchOption.AllDirectories))
+          {
+              var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path);
+              foreach (var d in tree.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error))
+              {
+                  Console.WriteLine(d.ToString());
+                  failures++;
+              }
+          }
+          Console.WriteLine($"CSHARP_SYNTAX_ERRORS={failures}");
+          Environment.Exit(failures == 0 ? 0 : 1);
+          CS
+          dotnet run --no-restore
