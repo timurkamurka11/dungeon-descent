@@ -22,7 +22,7 @@ namespace DungeonDescent.UI
 
         public void Configure(PlayerController owner)
         {
-            Instance=this;player=owner;font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");CreateEventSystem();CreateCanvas();BuildHud();BuildMainMenu();BuildPause();BuildSettings();BuildControls();BuildUpgrades();BuildDeath();Subscribe();player.SetMovementLocked(true);mainMenu.SetActive(true);hud.SetActive(false);
+            Instance=this;player=owner;font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");CreateEventSystem();CreateCanvas();BuildHud();BuildMainMenu();BuildPause();BuildSettings();BuildControls();BuildUpgrades();BuildDeath();Subscribe();SyncVitals();player.SetMovementLocked(true);mainMenu.SetActive(true);hud.SetActive(false);
         }
         private void Update()
         {
@@ -56,7 +56,7 @@ namespace DungeonDescent.UI
             bossPanel=PanelImage("Boss Frame",hud.transform,new Vector2(.5f,1),new Vector2(.5f,1),new Vector2(-430,-130),new Vector2(430,-40),new Color(.025f,.02f,.024f,.88f)).gameObject;bossName=Label("Boss Name",bossPanel.transform,"THE CRYPT WARDEN",22,TextAnchor.UpperCenter,TextMain);bossFill=Bar(bossPanel.transform,new Vector2(28,-67),new Vector2(804,18),new Color(.45f,.035f,.035f,1),"");bossValue=Label("Boss Value",bossPanel.transform,"",14,TextAnchor.LowerCenter,new Color(.72f,.66f,.55f,1));bossPanel.SetActive(false);
         }
         private Image Bar(Transform parent,Vector2 pos,Vector2 size,Color fill,string label)
-        {var bg=Rect(label+" Bar",parent,new Vector2(0,1),new Vector2(0,1),pos-new Vector2(0,size.y),pos+new Vector2(size.x,0));var bgi=bg.gameObject.AddComponent<Image>();bgi.color=new Color(.055f,.055f,.05f,1);var f=Rect("Fill",bg,Vector2.zero,Vector2.one,new Vector2(3,3),new Vector2(-3,-3));var img=f.gameObject.AddComponent<Image>();img.color=fill;img.type=Image.Type.Filled;img.fillMethod=Image.FillMethod.Horizontal;img.fillAmount=1f;if(!string.IsNullOrEmpty(label)){var l=Label("Caption",bg,label,13,TextAnchor.MiddleLeft,TextMain);l.rectTransform.offsetMin=new Vector2(8,0);}return img;}
+        {var bg=Rect(label+" Bar",parent,new Vector2(0,1),new Vector2(0,1),pos-new Vector2(0,size.y),pos+new Vector2(size.x,0));var bgi=bg.gameObject.AddComponent<Image>();bgi.color=new Color(.055f,.055f,.05f,1);var f=Rect("Fill",bg,Vector2.zero,Vector2.one,new Vector2(3,3),new Vector2(-3,-3));var img=f.gameObject.AddComponent<Image>();img.color=fill;img.type=Image.Type.Simple;f.pivot=new Vector2(0f,.5f);if(!string.IsNullOrEmpty(label)){var l=Label("Caption",bg,label,13,TextAnchor.MiddleLeft,TextMain);l.rectTransform.offsetMin=new Vector2(8,0);}return img;}
         private Text SmallHudText(Transform parent,Vector2 pos,string value){var r=Rect(value,parent,new Vector2(0,1),new Vector2(0,1),pos-new Vector2(0,22),pos+new Vector2(160,0));var t=r.gameObject.AddComponent<Text>();t.font=font;t.fontSize=14;t.color=TextMain;t.alignment=TextAnchor.MiddleLeft;t.text=value;return t;}
 
         private void BuildMainMenu()
@@ -70,7 +70,7 @@ namespace DungeonDescent.UI
         }
         private void BuildControls()
         {
-            controlsMenu=FullPanel("Controls",700,660);var box=controlsMenu.transform.Find("Carved Panel");var t=Label("Controls Text",box,"CONTROLS\n\nWASD   Move\nSHIFT   Sprint\nSPACE   Dodge / Evade\nLMB   Light Attack Combo\nF   Heavy Attack\nRMB   Block\nQ   Lock-on / Release\nE   Interact\nR   Healing Potion\nESC   Pause",23,TextAnchor.MiddleCenter,TextMain);t.rectTransform.offsetMin=new Vector2(40,90);t.rectTransform.offsetMax=new Vector2(-40,-80);ButtonLine("BACK",box,new Vector2(0,-245),CloseSubmenus);controlsMenu.SetActive(false);
+            controlsMenu=FullPanel("Controls",700,660);var box=controlsMenu.transform.Find("Carved Panel");var t=Label("Controls Text",box,"CONTROLS\n\nWASD   Move\nSHIFT   Sprint\nSPACE   Jump\nLEFT CTRL   Dodge / Roll\nLMB   Light Attack Combo\nF   Heavy Attack\nRMB   Block\nQ   Lock-on / Release\nE   Interact\nR   Healing Potion\nESC   Pause",23,TextAnchor.MiddleCenter,TextMain);t.rectTransform.offsetMin=new Vector2(40,90);t.rectTransform.offsetMax=new Vector2(-40,-80);ButtonLine("BACK",box,new Vector2(0,-245),CloseSubmenus);controlsMenu.SetActive(false);
         }
         private void BuildSettings()
         {
@@ -88,16 +88,18 @@ namespace DungeonDescent.UI
 
         private void Subscribe(){GameEvents.PlayerHealthChanged+=OnHealth;GameEvents.PlayerStaminaChanged+=OnStamina;GameEvents.EssenceChanged+=OnEssence;GameEvents.GoldChanged+=OnGold;GameEvents.PotionsChanged+=OnPotions;GameEvents.InteractionPromptChanged+=OnPrompt;GameEvents.BossHealthChanged+=OnBoss;GameEvents.BossEnded+=OnBossEnded;}
         private void Unsubscribe(){GameEvents.PlayerHealthChanged-=OnHealth;GameEvents.PlayerStaminaChanged-=OnStamina;GameEvents.EssenceChanged-=OnEssence;GameEvents.GoldChanged-=OnGold;GameEvents.PotionsChanged-=OnPotions;GameEvents.InteractionPromptChanged-=OnPrompt;GameEvents.BossHealthChanged-=OnBoss;GameEvents.BossEnded-=OnBossEnded;}
-        private void OnHealth(float c,float m){if(healthFill!=null)healthFill.fillAmount=m>0?c/m:0;}
-        private void OnStamina(float c,float m){if(staminaFill!=null)staminaFill.fillAmount=m>0?c/m:0;}
+        private void OnHealth(float c,float m){SetBar(healthFill,HudValue.Normalized(c,m));}
+        private void OnStamina(float c,float m){SetBar(staminaFill,HudValue.Normalized(c,m));}
+        private void SetBar(Image bar,float normalized){if(bar==null)return;var scale=bar.rectTransform.localScale;scale.x=Mathf.Clamp01(normalized);scale.y=1f;scale.z=1f;bar.rectTransform.localScale=scale;}
+        private void SyncVitals(){var vitals=player!=null?player.GetComponent<PlayerVitals>():null;if(vitals==null)return;OnHealth(vitals.CurrentHealth,vitals.MaxHealth);OnStamina(vitals.CurrentStamina,vitals.MaxStamina);}
         private void OnEssence(int v){if(essenceText!=null)essenceText.text="ESSENCE  "+v;}
         private void OnGold(int v){if(goldText!=null)goldText.text="GOLD  "+v;}
         private void OnPotions(int c,int m){if(potionText!=null)potionText.text=$"POTIONS  {c}/{m}";}
         private void OnPrompt(string s){if(promptText!=null){promptText.text=s;promptText.transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(s));}}
-        private void OnBoss(string n,float c,float m){if(bossPanel==null)return;var show=!string.IsNullOrEmpty(n)&&c>0;if(!bossPanel.activeSelf&&show)bossPanel.SetActive(true);bossName.text=n;bossFill.fillAmount=m>0?c/m:0;bossValue.text=$"{Mathf.CeilToInt(c)} / {Mathf.CeilToInt(m)}";}
+        private void OnBoss(string n,float c,float m){if(bossPanel==null)return;var show=!string.IsNullOrEmpty(n)&&c>0;if(!bossPanel.activeSelf&&show)bossPanel.SetActive(true);bossName.text=n;SetBar(bossFill,HudValue.Normalized(c,m));bossValue.text=$"{Mathf.CeilToInt(c)} / {Mathf.CeilToInt(m)}";}
         private void OnBossEnded(){if(bossPanel!=null)bossPanel.SetActive(false);}
 
-        private void StartGame(bool fresh){if(fresh)GameSession.Instance?.NewGame();mainMenu.SetActive(false);hud.SetActive(true);Time.timeScale=1f;paused=false;player?.SetMovementLocked(false);AudioManager.Instance?.SetMusic(MusicState.SafeRoom,1.5f);AudioManager.Instance?.SetAmbience("fireplace",.5f);var consumables=player?.GetComponent<PlayerConsumables>();consumables?.Refill();}
+        private void StartGame(bool fresh){if(fresh)GameSession.Instance?.NewGame();mainMenu.SetActive(false);hud.SetActive(true);SyncVitals();Time.timeScale=1f;paused=false;player?.SetMovementLocked(false);AudioManager.Instance?.SetMusic(MusicState.SafeRoom,1.5f);AudioManager.Instance?.SetAmbience("fireplace",.5f);var consumables=player?.GetComponent<PlayerConsumables>();consumables?.Refill();}
         private void TogglePause(){paused=!paused;pauseMenu.SetActive(paused);hud.SetActive(!paused);Time.timeScale=paused?0f:1f;player?.SetMovementLocked(paused);}
         private void ReturnMain(){paused=false;Time.timeScale=1f;pauseMenu.SetActive(false);hud.SetActive(false);mainMenu.SetActive(true);player?.SetMovementLocked(true);DungeonDescent.World.DungeonWorldBuilder.Instance?.ReturnPlayerToSafeRoom(true);}
         private void CloseSubmenus(){settingsMenu.SetActive(false);controlsMenu.SetActive(false);upgradeMenu.SetActive(false);if(paused){pauseMenu.SetActive(true);return;}if(submenuFromMain){mainMenu.SetActive(true);submenuFromMain=false;return;}hud.SetActive(true);player?.SetMovementLocked(false);}

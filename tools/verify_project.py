@@ -62,6 +62,35 @@ for base in [ROOT/'Assets/DungeonDescent/Art', ROOT/'Assets/DungeonDescent/Resou
         if media.stat().st_size <= 0:
             errors.append(f"empty media file: {media.relative_to(ROOT)}")
 
+# Rigged real-player asset and integration contract.
+for path in [
+    'Assets/DungeonDescent/Resources/Models/Hero/KayKit/Knight.fbx',
+    'Assets/DungeonDescent/Resources/Models/Hero/KayKit/knight_texture.png',
+    'Assets/DungeonDescent/Runtime/Player/PlayerModelFactory.cs',
+    'Assets/DungeonDescent/Editor/KayKitModelImportProcessor.cs',
+    'Assets/DungeonDescent/Runtime/Combat/MeleeTargeting.cs',
+    'Assets/DungeonDescent/Runtime/UI/HudValue.cs',
+]:
+    asset=req(path)
+    if asset.exists() and asset.is_file() and asset.stat().st_size <= 0:
+        errors.append(f'empty required player asset: {path}')
+contains('THIRD_PARTY_ASSETS.md','KayKit Character Pack: Adventurers')
+contains('THIRD_PARTY_ASSETS.md','CC0 1.0 Universal')
+contains('Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs','PlayerModelFactory.Build')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs','AnimationMixerPlayable')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerAnimationController.cs','applyRootMotion = false')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerController.cs','leftCtrlKey.wasPressedThisFrame')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerController.cs','spaceKey.wasPressedThisFrame')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs','OverlapCapsuleNonAlloc')
+contains('Assets/DungeonDescent/Runtime/Player/PlayerCombat.cs','MeleeTargeting.IsInsideMeleeArc')
+contains('Assets/DungeonDescent/Runtime/UI/GameUI.cs','HudValue.Normalized')
+bootstrap=(ROOT/'Assets/DungeonDescent/Runtime/Core/DungeonGameBootstrap.cs').read_text(errors='ignore')
+if 'VisualFactory.BuildHero(go.transform)' in bootstrap:
+    errors.append('bootstrap still instantiates procedural player hero')
+ui=(ROOT/'Assets/DungeonDescent/Runtime/UI/GameUI.cs').read_text(errors='ignore')
+if 'healthFill.fillAmount' in ui or 'staminaFill.fillAmount' in ui:
+    errors.append('HUD still uses broken sprite-less fillAmount path')
+
 # Ban explicit placeholder artifacts in project-owned runtime/art files.
 banned=[r'\bCapsule\b',r'\bPlaceholder\b',r'placeholder_ui',r'TODO:',r'TBD']
 for base in [ROOT/'Assets/DungeonDescent/Runtime', ROOT/'Assets/DungeonDescent/Art']:
