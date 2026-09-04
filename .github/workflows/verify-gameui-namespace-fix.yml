@@ -5,11 +5,11 @@ on:
     types: [opened]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
-    if: github.event.issue.title == 'verify-gameui-namespace-fix'
+    if: github.event.issue.title == 'apply-gameui-namespace-fix'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout fix branch
@@ -18,12 +18,36 @@ jobs:
           ref: fix/gameui-playervitals-namespace
           fetch-depth: 0
 
-      - name: PlayerVitals namespace regression check
+      - name: Apply minimal namespace fix
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('Assets/DungeonDescent/Runtime/UI/GameUI.cs')
+          text = p.read_text()
+          needle = 'using DungeonDescent.Audio;\n'
+          addition = 'using DungeonDescent.Combat;\n'
+          if addition not in text:
+              if needle not in text:
+                  raise SystemExit('expected import anchor not found')
+              text = text.replace(needle, needle + addition, 1)
+              p.write_text(text)
+          PY
+
+      - name: GREEN regression check
         run: |
           set -euo pipefail
           python tools/check_cross_namespace.py
+          python tools/verify_project.py
+          grep -q '^using DungeonDescent.Combat;' Assets/DungeonDescent/Runtime/UI/GameUI.cs
 
-      - name: Full repository verifier
+      - name: Commit fix
         run: |
           set -euo pipefail
-          python tools/verify_project.py
+          git config user.name 'timurkamurka11'
+          git config user.email 'timur2417@gmail.com'
+          git add Assets/DungeonDescent/Runtime/UI/GameUI.cs tools/check_cross_namespace.py
+          git diff --cached --check
+          git commit -m 'fix: import PlayerVitals namespace in GameUI'
+          git push origin HEAD:fix/gameui-playervitals-namespace
+          echo "FIX_HEAD=$(git rev-parse HEAD)"
