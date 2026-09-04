@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 0.1.1 — Rigged Player / Combat / HUD Pass — 2026-09-04
+
+- Replaced the active procedural player visual with the CC0 KayKit Adventurers Knight rig.
+- Added Humanoid import policy and Playables-driven Idle, Walk, Run, Jump, Dodge, Block, Hit, Death and one-handed sword attack animation integration with root motion disabled.
+- Added Space jump and moved dodge/roll to Left Ctrl.
+- Reworked melee hit registration from a small point sphere into a forward sword-reach capsule volume with testable arc/range filtering and unique-target damage.
+- Reworked HUD health/stamina/boss bars to use left-anchored visual scaling, fixing bars that remained visually full while values changed.
+- Added regression coverage for HUD normalization, melee geometry and health changed events.
+- Documented KayKit source, exact model SHA-256 and CC0 1.0 license in `THIRD_PARTY_ASSETS.md`.
+
 ## 0.1.0 — Vertical Slice Foundation — 2026-09-04
 
 - Created Unity 6000.3.19f1 URP project structure and Unity-safe Git ignore rules.
