@@ -1,0 +1,41 @@
+name: Inspect KayKit Knight
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.event.issue.title == 'inspect-kaykit-knight'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone KayKit source
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0.git /tmp/kaykit
+          cd /tmp/kaykit
+          git lfs pull || true
+      - name: Verify source files
+        run: |
+          set -euo pipefail
+          knight='/tmp/kaykit/addons/kaykit_character_pack_adventures/Characters/fbx/Knight.fbx'
+          tex='/tmp/kaykit/addons/kaykit_character_pack_adventures/Characters/fbx/knight_texture.png'
+          sword='/tmp/kaykit/addons/kaykit_character_pack_adventures/Assets/fbx/sword_1handed.fbx'
+          shield='/tmp/kaykit/addons/kaykit_character_pack_adventures/Assets/fbx/shield_badge_color.fbx'
+          test -s "$knight"; test -s "$tex"; test -s "$sword"; test -s "$shield"
+          stat -c 'KNIGHT_BYTES=%s' "$knight"
+          sha256sum "$knight" "$tex" "$sword" "$shield"
+          file "$knight"
+      - name: Inspect FBX animation stacks
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq assimp-utils
+          knight='/tmp/kaykit/addons/kaykit_character_pack_adventures/Characters/fbx/Knight.fbx'
+          assimp info "$knight" > /tmp/assimp.txt 2>&1 || { cat /tmp/assimp.txt; exit 1; }
+          cat /tmp/assimp.txt
+          echo '=== ANIMATION-LIKE STRINGS ==='
+          strings -n 4 "$knight" | grep -Eia 'idle|walk|run|jump|roll|dodge|attack|melee|hit|death|block' | sort -u | head -n 250 || true
