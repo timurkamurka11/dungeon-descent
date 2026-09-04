@@ -21,6 +21,7 @@ namespace DungeonDescent.Player
         public float WalkSpeed = 3.1f;
         public float JogSpeed = 5.1f;
         public float SprintSpeed = 7.2f;
+        public float JumpHeight = 1.35f;
         public Transform CameraTarget { get; private set; }
         public Vector3 FacingDirection => transform.forward;
         public Vector3 LastMoveDirection => lastMoveDirection;
@@ -52,7 +53,7 @@ namespace DungeonDescent.Player
         {
             if (Keyboard.current == null || controller == null || !vitals.IsAlive) return;
             if (cameraTransform == null && Camera.main != null) cameraTransform = Camera.main.transform;
-            if (Keyboard.current.spaceKey.wasPressedThisFrame) TryDodge();
+            if (Keyboard.current.leftCtrlKey.wasPressedThisFrame) TryDodge();
             if (!movementLocked && !dodging) Move();
             else ApplyGravityOnly();
         }
@@ -74,7 +75,15 @@ namespace DungeonDescent.Player
             var sprint = Keyboard.current.leftShiftKey.isPressed && input.y > .1f && vitals.CurrentStamina > 2f;
             var speed = sprint ? SprintSpeed : (input.magnitude > .45f ? JogSpeed : WalkSpeed);
             if (sprint && direction.sqrMagnitude > .01f && !vitals.SpendStamina(12f * Time.deltaTime)) speed = JogSpeed;
-            verticalVelocity = controller.isGrounded ? -2f : verticalVelocity + Physics.gravity.y * Time.deltaTime;
+
+            if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
+            if (controller.isGrounded && Keyboard.current.spaceKey.wasPressedThisFrame)
+            {
+                verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Physics.gravity.y);
+                animationController?.PlayJump();
+            }
+            verticalVelocity += Physics.gravity.y * Time.deltaTime;
+
             var velocity = direction * speed + Vector3.up * verticalVelocity;
             controller.Move(velocity * Time.deltaTime);
             animationController?.SetLocomotion(Mathf.Clamp01(direction.magnitude * speed / SprintSpeed), controller.isGrounded);
@@ -82,8 +91,10 @@ namespace DungeonDescent.Player
 
         private void ApplyGravityOnly()
         {
-            verticalVelocity = controller.isGrounded ? -2f : verticalVelocity + Physics.gravity.y * Time.deltaTime;
+            if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
+            else verticalVelocity += Physics.gravity.y * Time.deltaTime;
             controller.Move(Vector3.up * verticalVelocity * Time.deltaTime);
+            animationController?.SetLocomotion(0f, controller.isGrounded);
         }
 
         public bool TryDodge()
@@ -120,6 +131,7 @@ namespace DungeonDescent.Player
             transform.SetPositionAndRotation(position, rotation);
             controller.enabled = true;
             verticalVelocity = 0f;
+            animationController?.ResetPose();
         }
     }
 }
